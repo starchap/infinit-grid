@@ -46,8 +46,6 @@ export class InfiniteGridComponent<E, H> implements OnInit, AfterViewInit {
   headerTemplate: TemplateRef<ElementRef> | null = null;
   @ContentChild('content')
   contentTemplate: TemplateRef<ElementRef> | null = null;
-/*  @ViewChild('infiniteGridContainer')
-  infiniteGridContainer: ElementRef | null = null;*/
   @ViewChild('infiniteGridContainer')
   set infiniteGridContainer(infiniteGridContainer: ElementRef){
     this._infiniteGridContainer = infiniteGridContainer;
@@ -86,6 +84,8 @@ export class InfiniteGridComponent<E, H> implements OnInit, AfterViewInit {
 
   private lastWindowWidth: number = 0;
   private lastWindowHeight: number = 0;
+  private lastVerticalScrollPosition: number = 0;
+  private lastHorizontalScrollPosition: number = 0;
   private _infiniteGridContainer?: ElementRef;
 
   constructor(private cd: ChangeDetectorRef) {
@@ -117,8 +117,13 @@ export class InfiniteGridComponent<E, H> implements OnInit, AfterViewInit {
 
   @Debounce(15)
   scroll(event) {
-    this.verticalScrollPosition.next(this.getActualScrollRange(event.target.scrollHeight, event.target.clientHeight, event.target.scrollTop));
-    this.horizontalScrollPosition.next(this.getActualScrollRange(event.target.scrollWidth, event.target.clientWidth, event.target.scrollLeft));
+    if(this.lastVerticalScrollPosition !== event.target.scrollTop){
+      this.verticalScrollPosition.next(this.getActualScrollRange(event.target.scrollHeight, event.target.clientHeight, event.target.scrollTop));
+    }else if(this.lastHorizontalScrollPosition !== event.target.scrollLeft){
+      this.horizontalScrollPosition.next(this.getActualScrollRange(event.target.scrollWidth, event.target.clientWidth, event.target.scrollLeft));
+    }
+    this.lastVerticalScrollPosition = event.target.scrollTop;
+    this.lastHorizontalScrollPosition = event.target.scrollLeft;
   }
 
   private getActualScrollRange(dimension: number, clientDimension: number, barStart: number): GridRange {
