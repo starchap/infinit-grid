@@ -2,8 +2,8 @@
   <div class="grid-column"
        [style]="{width: gridColumnWidth+'px',
        height: gridColumnHeight+'px',
-       transform: 'translateX('+translateX+'px) ' + 'translateY('+translateY+'px)'}">
-    <div class="flex" [style]="{top: (0-translateY)+'px'}">
+       transform: 'translateX('+translateHorizontal+'px) ' + 'translateY('+translateVertical+'px)'}">
+    <div class="flex" [style]="{top: (-translateVertical)+'px'}">
       <div class="grid-row" *ngFor="let header of getHeaderRange$ | async">
         <ng-container [ngTemplateOutlet]="headerTemplate"
                       [ngTemplateOutletContext]="{$implicit: header}"></ng-container>

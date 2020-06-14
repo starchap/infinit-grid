@@ -1,17 +1,17 @@
 import {
+  ChangeDetectionStrategy,
   Component,
-  Output,
-  EventEmitter,
-  HostListener,
-  Input,
-  TemplateRef,
   ContentChild,
   ElementRef,
+  EventEmitter,
+  Input,
   OnInit,
+  Output,
+  TemplateRef,
   ViewChild
 } from '@angular/core';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
-import {map} from 'rxjs/operators';
+import {map, tap} from 'rxjs/operators';
 import Debounce from 'debounce-decorator';
 
 export type GridRange = {
@@ -37,52 +37,55 @@ export class InfiniteGridComponent<E, H> implements OnInit {
   @Output() horizontalEndReached: EventEmitter<boolean> = new EventEmitter<boolean>();
   @Output() headerRange: EventEmitter<H[]> = new EventEmitter<H[]>();
 
+  verticalScrollPosition: BehaviorSubject<GridRange> = new BehaviorSubject<GridRange>(this.getDefaultGridRange());
+  horizontalScrollPosition: BehaviorSubject<GridRange> = new BehaviorSubject<GridRange>(this.getDefaultGridRange());
   @ContentChild('header')
   headerTemplate: TemplateRef<ElementRef> | null = null;
   @ContentChild('content')
   contentTemplate: TemplateRef<ElementRef> | null = null;
+/*  @ViewChild('infiniteGridContainer')
+  infiniteGridContainer: ElementRef | null = null;*/
   @ViewChild('infiniteGridContainer')
-  infiniteGridContainer: ElementRef | null = null;
+  set infiniteGridContainer(infiniteGridContainer: ElementRef){
+    this.verticalScrollPosition.next(this.getDefaultGridRange('vertical', this.verticalScrollPosition.value, infiniteGridContainer));
+    this.horizontalScrollPosition.next(this.getDefaultGridRange('horizontal', this.horizontalScrollPosition.value, infiniteGridContainer));
+  }
 
-  verticalScrollPosition: BehaviorSubject<GridRange> = new BehaviorSubject<GridRange>(this.getDefaultGridRange());
-  horizontalScrollPosition: BehaviorSubject<GridRange> = new BehaviorSubject<GridRange>(this.getDefaultGridRange());
   verticalRang: Subject<GridRange> = new Subject<GridRange>();
   horizontalRange: Subject<GridRange> = new Subject<GridRange>();
 
-  translateX: number = 0;
-  translateY: number = 0;
+  translateHorizontal: number = 0;
+  translateVertical: number = 0;
 
   get gridColumnWidth(): number {
-    return (this.headers.length * this.standardWidth) - this.translateX;
+    return (this.headers.length * this.standardWidth) - this.translateHorizontal;
   }
 
   get gridColumnHeight(): number {
-    return (this.elements.length * this.standardHeight) - this.translateY;
+    return (this.elements.length * this.standardHeight) - this.translateVertical;
   }
 
-  getHeaderRange$: Observable<H[]> = this.verticalRang.pipe(
+  getHeaderRange$: Observable<H[]> = this.horizontalRange.pipe(
+    tap(gridRange => this.translateHorizontal = gridRange.begin * this.standardWidth),
     map(gridRange => {
-      this.translateX = gridRange.begin * this.standardWidth;
       const min: number = gridRange.begin < gridRange.min ? gridRange.min : gridRange.begin;
       const max: number = gridRange.max < gridRange.end ? gridRange.max : gridRange.end;
-      const headerRange: H[] = [...this.headers].slice(min, max);
-      this.headerRange.emit(headerRange);
-      return headerRange;
-    }));
+      return [...this.headers].slice(min, max);
+    }),
+    tap(headerRange => this.headerRange.emit(headerRange)),
+  );
 
-  elementRange$: Observable<E[]> = this.horizontalRange.pipe(
-    map(gridRange => {
-      this.translateY = gridRange.begin * this.standardHeight;
-      return [...this.elements].slice(gridRange.begin, gridRange.end);
-    }));
+  elementRange$: Observable<E[]> = this.verticalRang.pipe(
+    tap(gridRange => this.translateVertical = gridRange.begin * this.standardHeight),
+    map(gridRange => [...this.elements].slice(gridRange.begin, gridRange.end))
+  );
 
   private lastWindowWidth: number = 0;
   private lastWindowHeight: number = 0;
 
-
   ngOnInit(): void {
-    this.initRangeListener(this.verticalScrollPosition, this.verticalEndReached, this.verticalRang, this.standardWidth);
-    this.initRangeListener(this.horizontalScrollPosition, this.horizontalEndReached, this.horizontalRange, this.standardHeight);
+    this.initRangeListener(this.verticalScrollPosition, this.verticalEndReached, this.verticalRang, this.standardHeight);
+    this.initRangeListener(this.horizontalScrollPosition, this.horizontalEndReached, this.horizontalRange, this.standardWidth);
   }
 /*
 
@@ -102,8 +105,8 @@ export class InfiniteGridComponent<E, H> implements OnInit {
     }
   }
 */
-/*
 
+/*
   @HostListener('window:resize', ['$event'])
   onResize(event) {
     if(this.sizeIncrease(this.lastWindowHeight, event.target.innerHeight)){
@@ -126,17 +129,17 @@ export class InfiniteGridComponent<E, H> implements OnInit {
 
   @Debounce(15)
   scroll(event) {
-    this.setActualScrollRange(event.target.scrollHeight, event.target.clientHeight, event.target.scrollTop, this.horizontalScrollPosition);
-    this.setActualScrollRange(event.target.scrollWidth, event.target.clientWidth, event.target.scrollLeft, this.verticalScrollPosition);
+    this.verticalScrollPosition.next(this.getActualScrollRange(event.target.scrollHeight, event.target.clientHeight, event.target.scrollTop));
+    this.horizontalScrollPosition.next(this.getActualScrollRange(event.target.scrollWidth, event.target.clientWidth, event.target.scrollLeft));
   }
 
-  private setActualScrollRange(dimension: number, clientDimension: number, barStart: number, gridEmitter: Subject<GridRange>): void {
+  private getActualScrollRange(dimension: number, clientDimension: number, barStart: number): GridRange {
     const max = dimension - clientDimension;
     const barEnd: number = barStart + (dimension - max);
-    gridEmitter.next({begin: barStart, end: barEnd, min: 0, max: dimension});
+    return {begin: barStart, end: barEnd, min: 0, max: dimension}
   }
 
-  private setItemScrollRange(gridRange: GridRange, standardDimension: number): GridRange {
+  private getItemScrollRange(gridRange: GridRange, standardDimension: number): GridRange {
     const scrollBarBegin: number = Math.floor(gridRange.begin / standardDimension);
     const scrollBarEnd: number = Math.ceil(gridRange.end / standardDimension) + this.preRender;
     const maxScroll: number = Math.floor(gridRange.max / standardDimension);
@@ -144,19 +147,25 @@ export class InfiniteGridComponent<E, H> implements OnInit {
   }
 
   private initRangeListener(scrollPositionSubject: Subject<GridRange>, endReachedEmitter: EventEmitter<boolean>, rangeSubject: Subject<GridRange>, standard: number): void {
-    scrollPositionSubject.subscribe((range => {
-      if (range.end === range.max) {
-        endReachedEmitter.emit(true);
-      }
-      rangeSubject.next(this.setItemScrollRange(range, standard));
-    }));
+    scrollPositionSubject.pipe(
+      tap(range => rangeSubject.next(this.getItemScrollRange(range, standard))),
+      tap(range => range.end === range.max && endReachedEmitter.emit(true))
+    ).subscribe();
   }
 
-  private getDefaultGridRange(direction?: 'horizontal' | 'vertical', knownGridRange?: GridRange): GridRange {
+/*  private getDefaultGridRange(direction?: 'horizontal' | 'vertical', knownGridRange?: GridRange): GridRange {
     if (this.infiniteGridContainer && direction && knownGridRange) {
       const max: number = direction === 'vertical' ? this.infiniteGridContainer.nativeElement.firstChild.offsetHeight : this.infiniteGridContainer.nativeElement.firstChild.offsetWidth;
       const end: number = direction === 'vertical' ? this.infiniteGridContainer.nativeElement.offsetHeight : this.infiniteGridContainer.nativeElement.offsetWidth;
       return {...knownGridRange, max, end};
+    }
+    return {min: 0, max: 0, begin: 0, end: 0};
+  }*/
+  private getDefaultGridRange(direction?: 'horizontal' | 'vertical', knownGridRange?: GridRange, element?: ElementRef): GridRange {
+    if (element && direction && knownGridRange) {
+      const max: number = direction === 'vertical' ? element.nativeElement.firstChild.offsetHeight : element.nativeElement.firstChild.offsetWidth;
+      const end: number = direction === 'vertical' ? element.nativeElement.offsetHeight : element.nativeElement.offsetWidth;
+      return {...knownGridRange, max, end:end};
     }
     return {min: 0, max: 0, begin: 0, end: 0};
   }
