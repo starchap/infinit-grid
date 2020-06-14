@@ -1,9 +1,11 @@
 import {
-  ChangeDetectionStrategy,
+  AfterViewInit,
+  ChangeDetectionStrategy, ChangeDetectorRef,
   Component,
   ContentChild,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnInit,
   Output,
@@ -24,9 +26,10 @@ export type GridRange = {
 @Component({
   selector: 'app-infinite-grid',
   templateUrl: './infinite-grid.component.html',
-  styleUrls: ['./infinite-grid.component.css']
+  styleUrls: ['./infinite-grid.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class InfiniteGridComponent<E, H> implements OnInit {
+export class InfiniteGridComponent<E, H> implements OnInit, AfterViewInit {
   @Input() headers: H[] = [];
   @Input() elements: E[] = [];
   @Input() standardWidth: number = 100;
@@ -47,6 +50,7 @@ export class InfiniteGridComponent<E, H> implements OnInit {
   infiniteGridContainer: ElementRef | null = null;*/
   @ViewChild('infiniteGridContainer')
   set infiniteGridContainer(infiniteGridContainer: ElementRef){
+    this._infiniteGridContainer = infiniteGridContainer;
     this.verticalScrollPosition.next(this.getDefaultGridRange('vertical', this.verticalScrollPosition.value, infiniteGridContainer));
     this.horizontalScrollPosition.next(this.getDefaultGridRange('horizontal', this.horizontalScrollPosition.value, infiniteGridContainer));
   }
@@ -72,7 +76,7 @@ export class InfiniteGridComponent<E, H> implements OnInit {
       const max: number = gridRange.max < gridRange.end ? gridRange.max : gridRange.end;
       return [...this.headers].slice(min, max);
     }),
-    tap(headerRange => this.headerRange.emit(headerRange)),
+    tap(headerRange => this.headerRange.emit(headerRange))
   );
 
   elementRange$: Observable<E[]> = this.verticalRang.pipe(
@@ -82,38 +86,23 @@ export class InfiniteGridComponent<E, H> implements OnInit {
 
   private lastWindowWidth: number = 0;
   private lastWindowHeight: number = 0;
+  private _infiniteGridContainer?: ElementRef;
+
+  constructor(private cd: ChangeDetectorRef) {
+  }
 
   ngOnInit(): void {
     this.initRangeListener(this.verticalScrollPosition, this.verticalEndReached, this.verticalRang, this.standardHeight);
     this.initRangeListener(this.horizontalScrollPosition, this.horizontalEndReached, this.horizontalRange, this.standardWidth);
   }
-/*
 
-  @HostListener('window:resize', ['$event'])
-  onResize(event) {
-    this.sizeIncrease(this.lastWindowHeight, event.target.innerHeight, this.verticalScrollPosition);
-    this.sizeIncrease(this.lastWindowWidth, event.target.innerWidth, this.horizontalScrollPosition);
-    this.lastWindowWidth = event.target.innerWidth;
-    this.lastWindowHeight = event.target.innerHeight;
-  }
-
-  sizeIncrease(lastDimension: number, currentDimension: number, trigger: BehaviorSubject<GridRange>): void {
-    if (currentDimension > lastDimension) {
-/!*      const bla: number = currentDimension - lastDimension;
-      trigger.next({...trigger.value, end: trigger.value.end + bla, max: trigger.value.max + bla});*!/
-      trigger.next(this.getDefaultGridRange(trigger === this.verticalScrollPosition?'vertical':'horizontal', trigger.value));
-    }
-  }
-*/
-
-/*
   @HostListener('window:resize', ['$event'])
   onResize(event) {
     if(this.sizeIncrease(this.lastWindowHeight, event.target.innerHeight)){
-      this.verticalScrollPosition.next(this.getDefaultGridRange('vertical', this.verticalScrollPosition.value))
+      this.verticalScrollPosition.next(this.getDefaultGridRange('vertical', this.verticalScrollPosition.value, this._infiniteGridContainer))
     }
     if(this.sizeIncrease(this.lastWindowWidth, event.target.innerWidth)){
-      this.horizontalScrollPosition.next(this.getDefaultGridRange('horizontal', this.horizontalScrollPosition.value))
+      this.horizontalScrollPosition.next(this.getDefaultGridRange('horizontal', this.horizontalScrollPosition.value, this._infiniteGridContainer))
     }
     this.lastWindowWidth = event.target.innerWidth;
     this.lastWindowHeight = event.target.innerHeight;
@@ -125,7 +114,6 @@ export class InfiniteGridComponent<E, H> implements OnInit {
     }
     return false;
   }
-*/
 
   @Debounce(15)
   scroll(event) {
@@ -153,14 +141,6 @@ export class InfiniteGridComponent<E, H> implements OnInit {
     ).subscribe();
   }
 
-/*  private getDefaultGridRange(direction?: 'horizontal' | 'vertical', knownGridRange?: GridRange): GridRange {
-    if (this.infiniteGridContainer && direction && knownGridRange) {
-      const max: number = direction === 'vertical' ? this.infiniteGridContainer.nativeElement.firstChild.offsetHeight : this.infiniteGridContainer.nativeElement.firstChild.offsetWidth;
-      const end: number = direction === 'vertical' ? this.infiniteGridContainer.nativeElement.offsetHeight : this.infiniteGridContainer.nativeElement.offsetWidth;
-      return {...knownGridRange, max, end};
-    }
-    return {min: 0, max: 0, begin: 0, end: 0};
-  }*/
   private getDefaultGridRange(direction?: 'horizontal' | 'vertical', knownGridRange?: GridRange, element?: ElementRef): GridRange {
     if (element && direction && knownGridRange) {
       const max: number = direction === 'vertical' ? element.nativeElement.firstChild.offsetHeight : element.nativeElement.firstChild.offsetWidth;
@@ -168,5 +148,9 @@ export class InfiniteGridComponent<E, H> implements OnInit {
       return {...knownGridRange, max, end:end};
     }
     return {min: 0, max: 0, begin: 0, end: 0};
+  }
+
+  ngAfterViewInit(): void {
+    this.cd.detectChanges();
   }
 }
