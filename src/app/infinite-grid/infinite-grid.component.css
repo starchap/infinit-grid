@@ -1,0 +1,24 @@
+:host{
+  height: inherit;
+}
+
+.infinite-grid-container{
+  overflow: scroll;
+  height: inherit;
+}
+
+.grid-row{
+  height: inherit;
+  display: flex;
+  flex-direction: row;
+}
+
+.grid-column{
+  display: flex;
+  flex-direction: column;
+}
+
+.flex{
+  position: sticky;
+  display: flex;
+}

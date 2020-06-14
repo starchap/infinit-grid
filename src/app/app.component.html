@@ -1,0 +1,10 @@
+<div class="container">
+  <app-infinite-grid [headers]="headers" [elements]="products" (headerRange)="setHeaderRange($event)">
+    <ng-template #header let-item>
+      <button [ngClass]="'column'+item.id">{{item.name}}</button>
+    </ng-template>
+    <ng-template #content let-item>
+      <button [ngClass]="'column'+headerRan.id" class="element" *ngFor="let headerRan of headerRange">{{getProductAttribute(item, headerRan)}}</button>
+    </ng-template>
+  </app-infinite-grid>
+</div>
