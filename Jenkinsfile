@@ -1,5 +1,10 @@
 pipeline {
-  agent any
+  agent {
+    node {
+      label '8gb'
+    }
+
+  }
   stages {
     stage('Init') {
       steps {
